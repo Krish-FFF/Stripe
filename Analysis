@@ -1,0 +1,186 @@
+# Stripe
+#Python analysis for Stripe churn assignment
+
+#just STRIPE it
+
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+from scipy.cluster.vq import kmeans, vq
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from io import StringIO
+import os
+os.makedirs('visualizations', exist_ok=True)
+raw_data_text = """Date,Month of churn request,UserID,Lifetime Net Processing Volume (NPV),Last 19 months NPV,Last Month NPV (Net Processing Volume),Segment ,User Country,Intended Processor ,Reason for Migration Request,Outcome,Cohort
+43910,3,1,1794181.7,221000,44650,startup,GB,SmitPay, Country Availability -- Acquiring,Saved,Large
+43984,6,2,10612381.7,8500000,285000,growth,DE,PayQuick, Country Availability -- Acquiring,Churning,Large
+43930,4,3,2626289.4028,1628600,86000,small_business,GB,PayQuick, Country Availability -- Acquiring,Churning,Large
+43924,4,4,910981.7,170000,47000,small_business,HK,Euromart, Country Availability -- Acquiring,Saved,Medium
+43901,3,5,699181.7,119000,40000,startup,AU,VisionIQShop, Country Availability -- Payouts,Saved,Medium
+43949,4,6,263347.69999999995,96730,6856,small_business,US,DobDobDob, Country Availability -- Payouts,Churning,Medium
+43838,1,7,106840.51999999999,101790.05,3326.25,small_business,US,ChinaPay, Customer Service - Experience,Churning,Medium
+43993,6,8,537.7832,324.34299999999996,64,small_business,US,PayNow, Customer Service - Experience,Churning,Low
+43852,1,9,7343713.699999999,2805000,605000,small_business,CA,PayNow, Customer Service - Experience,Churning,Large
+44175,12,10,75081.7,16150,4250,startup,AU,ChinaPay, Customer Service - Experience,Churning,Low
+43940,4,11,77696.1344,31550.266,3562.825,small_business,US,Euromart, Customer Service - Experience,Churning,Low
+43952,5,12,1424783.4364,178600.963,4489.99,small_business,CA,Euromart, Customer Service - Experience,Saved,Large
+43890,2,13,2468282.8304,877200.969,42768.245,small_business,US,Donatet, Customer Service - Experience,Churning,Large
+43970,5,14,23641.699999999997,8500,4200,startup,DE,BinBin, Customer Service - Experience,Saved,Low
+43950,4,15,258193.70359999998,164384.152,44395.445,small_business,US,BinBin, Customer Service - Experience,Saved,Medium
+43858,1,16,3672479.8279999997,2646170.819,482258.55,startup,US,BinBin, Customer Service - Experience,Saved,Large
+43859,1,17,181.7,0,0,small_business,US,Euromart, Customer Service - Experience,Saved,Low
+43993,6,18,925930.688,664688.1,48480.5,small_business,CA,AuthFast, Customer Service - Experience,Saved,Medium
+43889,2,19,26146181.7,16150000,240000,small_business,JP,PayQuick, Customer Service - SLA/Dedicated Support,Churning,Large
+43949,4,20,41581.7,22100,4000,small_business,DK,Euromart, Customer Service - SLA/Dedicated Support,Churning,Low
+43901,3,21,4735.7,2805,0,small_business,JP,AuthFast, Customer Service - SLA/Dedicated Support,Churning,Low
+43886,2,22,1413835.3735999998,91375,2430,startup,US,ChinaPay, Doesn't integrate with my other tools or partners ,Churning,Large
+43999,6,23,414181.69999999995,153000,22001,small_business,AU,PayQuick, Doesn't integrate with my other tools or partners  ,Churning,Medium
+43837,1,24,1918464.4999999998,1071000,80000,startup,US,PayQuick, Doesn't integrate with my other tools or partners  ,Churning,Large
+43838,1,25,1064109.26,261657.19999999998,9667.5,small_business,US,SmitPay, Doesn't integrate with my other tools or partners  ,Churning,Large
+43837,1,26,1569816.9943999997,130861.01900000001,9292.08,small_business,US,SmitPay, Doesn't integrate with my other tools or partners  ,Churning,Large
+43832,1,27,365732.90839999996,305209.653,20826.805,startup,US,SmitPay, Doesn't integrate with my other tools or partners  ,Churning,Medium
+43952,5,28,3036181.6999999997,1251200,605000,startup,US,SmitPay, Doesn't integrate with my other tools or partners  ,Saved,Large
+43874,2,29,23641.699999999997,1105,0,startup,GB,SmitPay, Doesn't integrate with my other tools or partners  ,Churning,Low
+43901,3,30,68088.73999999999,62576.1,882.5,small_business,US,SmitPay, Doesn't integrate with my other tools or partners  ,Churning,Low
+43986,6,31,922158.4579999999,9093.575,442.42,small_business,US,SmitPay, Doesn't integrate with my other tools or partners  ,Churning,Medium
+43852,1,32,16157221.7,5695000,300000,growth,US,DobDobDob, Doesn't integrate with my other tools or partners  ,Churning,Large
+43888,2,33,12817621.7,1201000,200000,startup,US,PayNow, Doesn't integrate with my other tools or partners  ,Churning,Large
+43921,3,34,1556286.2047999997,158155.775,6652.425,small_business,GB,PayNow, Doesn't integrate with my other tools or partners  ,Saved,Large
+43844,1,35,390480.19999999995,144818.75,4282.25,small_business,US,PayQuick, Doesn't integrate with my other tools or partners  ,Churning,Medium
+43934,4,36,1338781.7,22100,2690,growth,US,Euromart, Doesn't integrate with my other tools or partners  ,Churning,Large
+43875,2,37,542705.7644,322981.572,42928.92,startup,US,AuthFast, Doesn't integrate with my other tools or partners  ,Saved,Medium
+43914,3,38,128671.67839999998,65789.541,4208.32,small_business,GB,SilkMic, Doesn't integrate with my other tools or partners  ,Saved,Medium
+43949,4,39,414181.69999999995,153000,22001,small_business,AU,PayQuick, Doesn't integrate with my other tools or partners  ,Churning,Medium
+43996,6,453,672614.162,289673.727,60290.525,small_business,US,AuthFast,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Medium
+43901,3,454,370849.7276,203944.767,44942.445,small_business,MX,AuthFast,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Medium
+43937,4,455,178224.194,130797.26900000001,38666.285,small_business,US,AuthFast,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Medium
+43991,6,456,276181.69999999995,153000,9000,small_business,US,Euromart,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Medium
+43907,3,457,53561.286799999994,32012.19,2424.22,startup,US ,Euromart,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Low
+43844,1,458,7286581.699999999,2363000,60000,small_business,FR,Euromart,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Large
+43846,1,459,176821.69999999998,85000,3500,small_business,US,Euromart,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Medium
+43866,2,460,5421741.8564,1426245.5829999999,56268.32,small_business,US,Euromart,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Large
+43880,2,461,195805.9296,125216.15199999999,4288.465,small_business,US,Euromart,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Medium
+43893,3,462,2482709.6263999995,641530.683,23068.63,startup,US,Euromart,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Large
+43915,3,463,64957.7408,30390.525999999998,5249.385,small_business,US,Euromart,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Low
+43964,5,464,371832.42559999996,339929.195,53368.365,small_business,CA,BinBin,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Medium
+43979,5,465,385640.402,292287.715,85966.625,small_business,US,BinBin,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Medium
+43988,6,466,3864181.6999999997,1870000,42500,small_business,GB,BinBin,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Large
+43998,6,467,1942420.42668,1532735.385,32653.66,small_business,CA,BinBin,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Large
+43978,5,468,157909.584,153264.061,3550.09,small_business,US,AuthFast,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Medium
+43935,4,469,1904357.2188,1625124.3499999999,22944.49,startup,US,Donatet,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Large
+43929,4,470,1090188.9139999999,167176.92899999997,62666.5,small_business,US,Donatet,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Large
+43838,1,471,34681.7,33150,42,small_business,CA,Donatet,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Low
+43838,1,472,412496.55439999996,103516.38299999999,4263.63,small_business,US,Donatet,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Other/Migrating Data Only,Medium
+43837,1,473,524479.58,53840.309,899.3,startup,US,Shopapaloza,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Churning,Medium
+43835,1,474,786773.3647999999,158738.60499999998,4484.905,small_business,US,Shopapaloza,Other - User not leaving Stripe's payments but migrating data to a 3rd-party integration,Saved,Medium
+43879,2,475,44341.7,17850,4500,small_business,AU,Euromart,Other -- User Never Responded,Other/Migrating Data Only,Low
+43972,5,476,261155.51479999995,1222.3,359.5,small_business,US,Euromart,Other -- User Never Responded,Other/Migrating Data Only,Medium
+43902,3,477,276181.69999999995,170000,20000,small_business,DK,SmitPay,Other -- User Never Responded,Other/Migrating Data Only,Medium
+43894,3,478,40201.7,8500,250,small_business,GB,Shopapaloza,Other -- User Never Responded,Other/Migrating Data Only,Low
+"""
+df = pd.read_csv(StringIO(raw_data_text))
+df.columns = df.columns.str.strip()
+df = df.dropna(subset=['Outcome'])
+df['Log_Lifetime_NPV'] = np.log(df['Lifetime Net Processing Volume (NPV)'] + 1)
+df['Log_Last19_NPV'] = np.log(df['Last 19 months NPV'] + 1)
+df['Log_LastMonth_NPV'] = np.log(df['Last Month NPV (Net Processing Volume)'] + 1)
+print("DataFrame shape:", df.shape)
+print("\nHead:\n", df.head())
+print("\nBasic Statistics:\n", df.describe())
+churn_df = df[df['Outcome'] == 'Churning']
+print("\nChurned Users Count by Reason:\n", churn_df['Reason for Migration Request'].value_counts())
+print("\nChurn Rate Overall:", len(churn_df) / len(df) * 100, "%")
+df['Is_Churning'] = (df['Outcome'] == 'Churning').astype(int)
+features = ['Log_Lifetime_NPV', 'Log_Last19_NPV', 'Log_LastMonth_NPV']
+X = df[features].fillna(0)
+y = df['Is_Churning']
+np.random.seed(42)
+train_mask = np.random.rand(len(df)) < 0.8
+X_train = X[train_mask]
+y_train = y[train_mask]
+X_test = X[~train_mask]
+y_test = y[~train_mask]
+X_train = sm.add_constant(X_train)
+X_test = sm.add_constant(X_test)
+try:
+    model = sm.Logit(y_train, X_train)
+    result = model.fit(maxiter=100, disp=False)
+    print("\nLogistic Regression Summary:\n", result.summary())
+    pred_prob = result.predict(X_test)
+    pred = (pred_prob > 0.5).astype(int)
+    accuracy = np.mean(pred == y_test)
+    print(f"\nTest Accuracy: {accuracy * 100:.2f}%")
+    print("\nLogistic Inferences: Significant predictors (p < 0.05):\n", result.pvalues[result.pvalues < 0.05])
+    print("E.g., Higher log last-month NPV may correlate with lower churn risk if coeff negative.")
+except Exception as e:
+    print(f"Logistic model error (likely due to small data/perfect separation): {e}")
+    print("Fallback: Use for descriptive stats only.")
+new_data = pd.DataFrame({
+    'Log_Lifetime_NPV': [np.log(1000000 + 1)],
+    'Log_Last19_NPV': [np.log(500000 + 1)],
+    'Log_LastMonth_NPV': [np.log(20000 + 1)]
+})
+new_data = sm.add_constant(new_data, has_constant='add')
+for col in X_train.columns:
+    if col not in new_data.columns:
+        new_data[col] = 0
+new_data = new_data[X_train.columns]
+print("\nPredicted Churn Prob for Example New User:", result.predict(new_data)[0] if 'result' in locals() else "Model not fitted")
+npv_data = df[features].fillna(0).values
+mean_npv = np.mean(npv_data, axis=0)
+std_npv = np.std(npv_data, axis=0)
+std_npv[std_npv == 0] = 1e-8
+npv_data = (npv_data - mean_npv) / std_npv
+centroids, distortion = kmeans(npv_data, 3)
+cluster_labels, _ = vq(npv_data, centroids)
+df['Cluster'] = cluster_labels
+print("\nCluster Counts:\n", df['Cluster'].value_counts())
+print("\nChurn Rate by Cluster:\n", df.groupby('Cluster')['Is_Churning'].mean())
+print("\nEnhanced Inferences:")
+print("- Clustering reveals NPV-based user segments; e.g., Cluster 0 might be high-value with lower churn.")
+print("- Use logistic coeffs to infer: If log last-month NPV has negative coeff, active users less likely to churn.")
+print("- For new data, predict churn risk or assign clusters to prioritize retention (e.g., target high-churn clusters with support).")
+plt.figure(figsize=(12, 8))
+plt.subplot(2, 2, 1)
+sns.countplot(y='Reason for Migration Request', data=churn_df, order=churn_df['Reason for Migration Request'].value_counts().index)
+plt.title("Churn Count by Reason")
+plt.xlabel("Count")
+plt.ylabel("Reason")
+plt.savefig('visualizations/churn_by_reason.png')
+plt.subplot(2, 2, 2)
+churn_by_cohort = churn_df['Cohort'].value_counts()
+churn_by_cohort.plot.pie(autopct='%1.1f%%', colors=['skyblue', 'lightgreen', 'salmon'])
+plt.title("Churn Distribution by Cohort")
+plt.ylabel("")
+plt.savefig('visualizations/churn_by_cohort.png')
+plt.subplot(2, 2, 3)
+sns.histplot(churn_df['Lifetime Net Processing Volume (NPV)'], bins=10, kde=True)
+plt.title("Histogram of Lifetime NPV for Churned Users")
+plt.xlabel("Lifetime NPV")
+plt.ylabel("Frequency")
+plt.savefig('visualizations/hist_lifetime_npv.png')
+plt.subplot(2, 2, 4)
+sns.boxplot(x='Outcome', y='Last Month NPV (Net Processing Volume)', data=df)
+plt.title("Boxplot of Last Month NPV by Outcome")
+plt.xlabel("Outcome")
+plt.ylabel("Last Month NPV")
+plt.savefig('visualizations/box_last_month_npv.png')
+plt.tight_layout()
+plt.savefig('visualizations/combined_viz1.png')
+plt.close()
+plt.figure(figsize=(8, 6))
+sns.scatterplot(x='Lifetime Net Processing Volume (NPV)', y='Last Month NPV (Net Processing Volume)', hue='Cluster', data=df, palette='viridis')
+plt.title("Scatter Plot of NPV Features Colored by Cluster")
+plt.xlabel("Lifetime NPV")
+plt.ylabel("Last Month NPV")
+plt.savefig('visualizations/scatter_npv_clusters.png')
+plt.close()
+plt.figure(figsize=(8, 6))
+corr = df[features + ['Is_Churning']].corr()
+sns.heatmap(corr, annot=True, cmap='coolwarm')
+plt.title("Correlation Heatmap of NPV Features and Churn")
+plt.savefig('visualizations/corr_heatmap.png')
+plt.close()
+print("\nVisualizations saved to 'visualizations' folder.")
